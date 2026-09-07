@@ -82,28 +82,27 @@ M.HOLD_NAMES = {
 -- MODULE STATE
 -- ═════════════════════════════════════════════════════════════════════════════
 
-local _key = nil   -- cached 32-byte binary AES key (derived once on first use)
-local _iv  = nil   -- cached 16-byte binary IV
+-- Cached AES context — created once on first use.
+-- Holds the pre-expanded key schedule (60 round-key words) so keyExpand()
+-- never runs more than once per controller restart, regardless of how many
+-- polls or writes occur.
+local _ctx = nil
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- CRYPTO HELPERS
 -- ═════════════════════════════════════════════════════════════════════════════
 
-local function get_aes()
-  local ok, aes = pcall(require, "aes")
-  if not ok then
-    error("unisenza.lua requires aes.lua — load it first with require", 2)
+local function get_ctx()
+  if not _ctx then
+    local ok, aes = pcall(require, "aes")
+    if not ok then
+      error("unisenza.lua requires aes.lua — load it first with require", 2)
+    end
+    local key = aes.salus_key(M.GATEWAY_EUID)   -- MD5("Salus-"..euid)..zeros(16)
+    local iv  = aes.hex2bin(IV_HEX)
+    _ctx = aes.new_context(key, iv)             -- key schedule expanded here, once
   end
-  return aes
-end
-
-local function get_key_iv()
-  if not _key then
-    local aes = get_aes()
-    _key = aes.salus_key(M.GATEWAY_EUID)   -- key derivation: MD5("Salus-"..euid)..zeros
-    _iv  = aes.hex2bin(IV_HEX)
-  end
-  return _key, _iv
+  return _ctx
 end
 
 -- ═════════════════════════════════════════════════════════════════════════════
@@ -234,13 +233,12 @@ end
 -- ═════════════════════════════════════════════════════════════════════════════
 
 local function gateway_request(command, body_table)
-  local aes = get_aes()
-  local key, iv = get_key_iv()
+  local ctx = get_ctx()   -- cached: key schedule never re-expanded after first call
 
   local url     = string.format("http://%s:%d/deviceid/%s",
                                  M.GATEWAY_IP, M.GATEWAY_PORT, command)
   local payload = json_encode(body_table)
-  local cipher  = aes.encrypt(key, iv, payload)
+  local cipher  = ctx:encrypt(payload)
 
   local http  = require("socket.http")
   local ltn12 = require("ltn12")
@@ -262,7 +260,7 @@ local function gateway_request(command, body_table)
     return nil
   end
 
-  local plain = aes.decrypt(key, iv, table.concat(resp_chunks))
+  local plain = ctx:decrypt(table.concat(resp_chunks))
   return json_decode(plain)
 end
 

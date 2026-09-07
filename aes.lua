@@ -377,12 +377,50 @@ function M.bin2hex(bin)
   return (bin:gsub(".", function(c) return string.format("%02x", string.byte(c)) end))
 end
 
---- Derive the 32-byte Salus AES-256 key from the gateway EUID.
+--- Derive the 32-byte Unisenza Plus / Salus AES-256 key from the gateway EUID.
+-- key = MD5("Salus-" .. euid:lower()) .. string.rep("\0", 16)
 function M.salus_key(euid)
   return md5("Salus-" .. euid:lower()) .. string.rep("\0", 16)
 end
 
+--- Create a reusable encryption context — pre-expands the key schedule once.
+-- Use this instead of calling encrypt/decrypt directly when the same key is
+-- used repeatedly (e.g. every 30-second poll).  The key expansion is the most
+-- CPU-intensive part of AES; caching it avoids re-running it on every request.
+--
+-- @param key  32-byte binary string (from M.salus_key)
+-- @param iv   16-byte binary string (from M.hex2bin)
+-- @return context object with :encrypt(plain) and :decrypt(cipher) methods
+function M.new_context(key, iv)
+  local W, Nr = keyExpand(key)
+  local ctx = { _W = W, _Nr = Nr, _iv = iv }
+
+  function ctx:encrypt(plain)
+    local padded = pad(plain)
+    local out, prev = {}, self._iv
+    for i = 1, #padded, 16 do
+      local blk = string.sub(padded, i, i+15)
+      prev = aes_encrypt_block(xor_str(blk, prev), self._W, self._Nr)
+      out[#out+1] = prev
+    end
+    return table.concat(out)
+  end
+
+  function ctx:decrypt(cipher)
+    local out, prev = {}, self._iv
+    for i = 1, #cipher, 16 do
+      local blk = string.sub(cipher, i, i+15)
+      out[#out+1] = xor_str(aes_decrypt_block(blk, self._W, self._Nr), prev)
+      prev = blk
+    end
+    return unpad(table.concat(out))
+  end
+
+  return ctx
+end
+
 --- AES-256-CBC encrypt (PKCS#7 padding applied automatically).
+-- Prefer M.new_context() when the same key is used more than once.
 function M.encrypt(key, iv, plain)
   local W, Nr = keyExpand(key)
   local padded = pad(plain)
@@ -396,6 +434,7 @@ function M.encrypt(key, iv, plain)
 end
 
 --- AES-256-CBC decrypt (PKCS#7 padding removed automatically).
+-- Prefer M.new_context() when the same key is used more than once.
 function M.decrypt(key, iv, cipher)
   local W, Nr = keyExpand(key)
   local out, prev = {}, iv
