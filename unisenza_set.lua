@@ -50,7 +50,7 @@ local CBUS_NETWORK = 0
 -- ═════════════════════════════════════════════════════════════════════════════
 
 local function is_debug()
-  local ok, v = pcall(GetUserParam, CBUS_NETWORK, "Unisenza_Debug")
+  local ok, v = pcall(GetUserParam, CBUS_NETWORK, "Debug")
   return ok and (tonumber(v) or 0) == 1
 end
 

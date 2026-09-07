@@ -68,7 +68,7 @@ In the LogicMachine web UI (**Scripting → Lua libraries**), upload:
 - Paste `script_resident_poll.lua` as the body
 - Enable the script
 
-On first run, enable `Unisenza_Debug = 1` and check the log. You will see:
+On first run, enable `Debug = 1` and check the log. You will see:
 
 ```
 UNISENZA_POLL: discovered 3 device(s) on gateway 192.168.1.59
@@ -84,7 +84,7 @@ Create these on network `0` (or whichever network you set in `CBUS_NETWORK`):
 **Global:**
 | Parameter | Type | Purpose |
 |---|---|---|
-| `Unisenza_Debug` | Number | `1` = verbose logging, `0` = silent |
+| `Debug` | Number | `1` = verbose logging, `0` = silent |
 | `Unisenza_Status` | String | Last poll result (`OK` or error) |
 | `Unisenza_LastUpdated` | String | Timestamp of last successful poll |
 | `Unisenza_DeviceCount` | Number | Count of discovered devices |

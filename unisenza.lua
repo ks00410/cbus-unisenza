@@ -13,7 +13,7 @@
       gateway_ip   = "192.168.1.59",
       gateway_euid = "001E5E090292DD94",
       cbus_network = 0,
-      debug_param  = "Unisenza_Debug",
+      debug_param  = "Debug",
     })
 
   Usage — low-level API (for event scripts / direct control)
@@ -403,7 +403,7 @@ unisenza_device_cache = unisenza_device_cache or {}
 --   .gateway_ip    string   IP address of the gateway (overrides M.GATEWAY_IP)
 --   .gateway_euid  string   EUID from gateway sticker (overrides M.GATEWAY_EUID)
 --   .cbus_network  number   C-Bus network number for user params (default 0)
---   .debug_param   string   name of the boolean debug user param (default "Unisenza_Debug")
+--   .debug_param   string   name of the boolean debug user param (default "Debug")
 --   .debug         boolean  explicit debug override (default false)
 function M.Resident_Poll(config)
   config = config or {}
@@ -413,7 +413,7 @@ function M.Resident_Poll(config)
   if config.gateway_euid then M.GATEWAY_EUID = config.gateway_euid; _ctx = nil end
 
   local net        = config.cbus_network or 0
-  local debug_param = config.debug_param or "Unisenza_Debug"
+  local debug_param = config.debug_param or "Debug"
 
   -- Resolve debug flag: explicit override, or read from user param
   local dbg = config.debug or false
