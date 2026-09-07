@@ -419,7 +419,7 @@ function M.Resident_Poll(config)
   local dbg = config.debug or false
   if not dbg then
     local ok, v = pcall(GetUserParam, net, debug_param)
-    dbg = ok and (tonumber(v) or 0) == 1
+    dbg = ok and v == true
   end
 
   -- Safe write helper (local to this call, uses closure over net)

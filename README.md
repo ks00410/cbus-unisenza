@@ -84,7 +84,7 @@ Create these on network `0` (or whichever network you set in `CBUS_NETWORK`):
 **Global:**
 | Parameter | Type | Purpose |
 |---|---|---|
-| `Debug` | Number | `1` = verbose logging, `0` = silent |
+| `Debug` | Boolean | `true` = verbose logging, `false` = silent |
 | `Unisenza_Status` | String | Last poll result (`OK` or error) |
 | `Unisenza_LastUpdated` | String | Timestamp of last successful poll |
 | `Unisenza_DeviceCount` | Number | Count of discovered devices |
