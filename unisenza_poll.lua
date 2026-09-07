@@ -52,6 +52,12 @@ local _last_poll      = 0      -- os.time() of last successful poll
 local _known_devices  = nil    -- set on first successful poll; nil = not yet run
 local _missing_warned = {}     -- suppress repeated "param not found" warnings
 
+-- Device metadata cache — stores the full device table (including .data)
+-- keyed by device name.  Written on every successful poll; read by
+-- unisenza_set.lua via a shared global so writes don't need a redundant
+-- read_all() call.
+unisenza_device_cache = unisenza_device_cache or {}
+
 -- ═════════════════════════════════════════════════════════════════════════════
 -- LOGGING HELPERS
 -- ═════════════════════════════════════════════════════════════════════════════
@@ -136,6 +142,11 @@ function E.Resident_Poll()
         _known_devices[uid] = nil
       end
     end
+  end
+
+  -- ── update device metadata cache (used by unisenza_set.lua) ───────────────
+  for _, dev in ipairs(result) do
+    unisenza_device_cache[dev.name] = dev
   end
 
   -- ── write params for every discovered device ───────────────────────────────

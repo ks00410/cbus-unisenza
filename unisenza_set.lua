@@ -75,22 +75,29 @@ function E.Event()
   local setpt_x10 = ok_sp and tonumber(raw_sp) or nil
   local hold_type = ok_ht and tonumber(raw_ht) or nil
 
-  -- ── find the device on the gateway ────────────────────────────────────────
-  local ok_read, devices = pcall(unisenza.read_all)
-  if not ok_read or not devices then
-    local err = tostring(ok_read and "nil response" or devices)
-    log("UNISENZA_SET [" .. RADIATOR_NAME .. "]: read_all failed — " .. err)
-    return
-  end
+  -- ── find the device — use cache populated by unisenza_poll.lua ────────────
+  -- unisenza_device_cache is a global written by the resident poll script on
+  -- every successful read.  Using it avoids a redundant read_all() HTTP call
+  -- on every write event.  Falls back to read_all() only if the cache is cold
+  -- (e.g. the first write fires before the first poll has completed).
+  local target = unisenza_device_cache and unisenza_device_cache[RADIATOR_NAME]
 
-  local target = nil
-  for _, dev in ipairs(devices) do
-    if dev.name == RADIATOR_NAME then target = dev; break end
+  if not target then
+    dbglog("cache cold — falling back to read_all()", dbg)
+    local ok_read, devices = pcall(unisenza.read_all)
+    if not ok_read or not devices then
+      local err = tostring(ok_read and "nil response" or devices)
+      log("UNISENZA_SET [" .. RADIATOR_NAME .. "]: read_all failed — " .. err)
+      return
+    end
+    for _, dev in ipairs(devices) do
+      if dev.name == RADIATOR_NAME then target = dev; break end
+    end
   end
 
   if not target then
     log("UNISENZA_SET [" .. RADIATOR_NAME
-        .. "]: device not found in gateway response")
+        .. "]: device not found in gateway response or cache")
     return
   end
 
