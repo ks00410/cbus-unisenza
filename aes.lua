@@ -1,7 +1,8 @@
 --[[
   aes.lua — Pure-Lua AES-256-CBC + MD5  (Lua 5.1 compatible)
   ============================================================
-  For use on C-Bus SpaceLogic 5500AC controllers (no external libs).
+  For use on C-Bus SpaceLogic 5500AC / LogicMachine controllers.
+  No external dependencies — uses only the Lua 5.1 standard library.
 
   Public API
   ----------
