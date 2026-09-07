@@ -30,9 +30,9 @@ Radiators are **auto-discovered** from the gateway on every poll — there is no
 
 | File | Type | Purpose |
 |---|---|---|
-| [`aes.lua`](aes.lua) | Lua library | Pure-Lua AES-256-CBC + MD5. No dependencies. |
-| [`unisenza.lua`](unisenza.lua) | Lua library | Gateway API: `read_all()`, `set_temperature()`, `set_hold()` |
-| [`unisenza_poll.lua`](unisenza_poll.lua) | Resident script | Polls gateway every 30 s; auto-discovers devices; writes state to C-Bus user params |
+| [`aes.lua`](aes.lua) | Lua library | Pure-Lua AES-256-CBC + MD5. Uses `bit` library on LogicMachine for speed. |
+| [`unisenza.lua`](unisenza.lua) | Lua library | Gateway API: `read_all()`, `set_temperature()`, `set_hold()`, `Resident_Poll()` |
+| [`script_resident_poll.lua`](script_resident_poll.lua) | Resident script | Thin caller — set Sleep = 30 s, paste as body. One `Resident_Poll(config)` call. |
 | [`unisenza_set.lua`](unisenza_set.lua) | Event script | Fires when a `_Setpoint` or `_HoldType` param changes; pushes new value to gateway |
 
 ---
@@ -64,8 +64,8 @@ In the LogicMachine web UI (**Scripting → Lua libraries**), upload:
 
 - **Scripting → Resident scripts → Add new**
 - Name: `Unisenza Poll`
-- Sleep time: `1` second (the script rate-limits itself internally to 30 s)
-- Paste `unisenza_poll.lua` as the body
+- Sleep time: `30` seconds
+- Paste `script_resident_poll.lua` as the body
 - Enable the script
 
 On first run, enable `Unisenza_Debug = 1` and check the log. You will see:

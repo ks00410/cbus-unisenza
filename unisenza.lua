@@ -1,19 +1,25 @@
 --[[
-  unisenza.lua — Unisenza Plus gateway API for C-Bus / LogicMachine Lua
+  unisenza.lua — Unisenza Plus gateway library for C-Bus / LogicMachine
   ======================================================================
   Handles AES-256-CBC encrypted JSON-over-HTTP communication with the
   local Unisenza Plus gateway (PUMG021GW).
 
   The Unisenza Plus system is an OEM of the Salus iT600 platform.
 
-  Usage
-  -----
+  Usage — resident poll (call from a thin script_resident_poll.lua)
+  -----------------------------------------------------------------
     local unisenza = require("unisenza")
+    unisenza.Resident_Poll({
+      gateway_ip   = "192.168.1.59",
+      gateway_euid = "001E5E090292DD94",
+      cbus_network = 0,
+      debug_param  = "Unisenza_Debug",
+    })
 
+  Usage — low-level API (for event scripts / direct control)
+  ----------------------------------------------------------
+    local unisenza = require("unisenza")
     local devices = unisenza.read_all()
-    -- returns list of device tables (see Device fields below)
-    -- devices are auto-discovered from the gateway — no config required.
-
     unisenza.set_temperature(device, 21.5)
     unisenza.set_hold(device, unisenza.HOLD_SCHEDULE)
 
@@ -46,11 +52,12 @@
 local M = {}
 
 -- ═════════════════════════════════════════════════════════════════════════════
--- CONFIGURATION  — edit these to match your installation
+-- CONFIGURATION DEFAULTS
+-- These are used when calling the low-level API directly.
+-- When calling Resident_Poll(config), values are taken from the config table.
 -- ═════════════════════════════════════════════════════════════════════════════
 
 -- IP address of the Unisenza Plus gateway on your LAN.
--- Check your router's DHCP table or the Unisenza app for this value.
 M.GATEWAY_IP   = "192.168.1.59"
 M.GATEWAY_PORT = 80
 
@@ -376,6 +383,134 @@ function M.set_hold(device, hold_type)
     return true
   end
   return nil
+end
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- RESIDENT POLL
+-- Called once per sleep cycle from a thin script_resident_poll.lua script.
+-- Matches the pattern used by cbus-ecowitt and other C-Bus Lua integrations.
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Module-level state persisted between poll cycles
+local _known_devices  = nil   -- nil = first run
+local _missing_warned = {}
+
+-- Device metadata cache shared with event scripts via a Lua global
+unisenza_device_cache = unisenza_device_cache or {}
+
+--- Single poll iteration — call this from your resident script each sleep cycle.
+-- @param config table:
+--   .gateway_ip    string   IP address of the gateway (overrides M.GATEWAY_IP)
+--   .gateway_euid  string   EUID from gateway sticker (overrides M.GATEWAY_EUID)
+--   .cbus_network  number   C-Bus network number for user params (default 0)
+--   .debug_param   string   name of the boolean debug user param (default "Unisenza_Debug")
+--   .debug         boolean  explicit debug override (default false)
+function M.Resident_Poll(config)
+  config = config or {}
+
+  -- Apply config overrides
+  if config.gateway_ip   then M.GATEWAY_IP   = config.gateway_ip   end
+  if config.gateway_euid then M.GATEWAY_EUID = config.gateway_euid; _ctx = nil end
+
+  local net        = config.cbus_network or 0
+  local debug_param = config.debug_param or "Unisenza_Debug"
+
+  -- Resolve debug flag: explicit override, or read from user param
+  local dbg = config.debug or false
+  if not dbg then
+    local ok, v = pcall(GetUserParam, net, debug_param)
+    dbg = ok and (tonumber(v) or 0) == 1
+  end
+
+  -- Safe write helper (local to this call, uses closure over net)
+  local function safe_set(name, value)
+    if value == nil then return end
+    local ok = pcall(SetUserParam, net, name, value)
+    if not ok then
+      local key = net .. ":" .. name
+      if dbg or not _missing_warned[key] then
+        log("UNISENZA: UserParam '" .. name .. "' not found on network "
+            .. tostring(net) .. " — skipping")
+        _missing_warned[key] = true
+      end
+    end
+  end
+
+  if dbg then log("UNISENZA: polling gateway " .. M.GATEWAY_IP) end
+
+  -- Fetch all devices
+  local ok, devices = pcall(M.read_all)
+  if not ok or not devices then
+    local err = tostring(ok and "nil response" or devices)
+    log("UNISENZA: poll failed — " .. err)
+    safe_set("Unisenza_Status", "ERROR: " .. err)
+    return
+  end
+
+  local ts = os.date("%d %b %Y %H:%M:%S")
+
+  -- First-run discovery log
+  if _known_devices == nil then
+    log("UNISENZA: discovered " .. #devices .. " device(s) on gateway " .. M.GATEWAY_IP)
+    for _, dev in ipairs(devices) do
+      log(string.format("UNISENZA:   %-16s uid=%s", dev.name, dev.uid))
+    end
+    _known_devices = {}
+    for _, dev in ipairs(devices) do _known_devices[dev.uid] = true end
+  else
+    local current = {}
+    for _, dev in ipairs(devices) do current[dev.uid] = dev.name end
+    for uid, name in pairs(current) do
+      if not _known_devices[uid] then
+        log("UNISENZA: new device — " .. name .. " (" .. uid .. ")")
+        _known_devices[uid] = true
+      end
+    end
+    for uid in pairs(_known_devices) do
+      if not current[uid] then
+        log("UNISENZA: device gone — uid=" .. uid)
+        _known_devices[uid] = nil
+      end
+    end
+  end
+
+  -- Update device metadata cache for event scripts
+  for _, dev in ipairs(devices) do
+    unisenza_device_cache[dev.name] = dev
+  end
+
+  -- Write params for every discovered device
+  local lines = {}
+  for _, dev in ipairs(devices) do
+    local name      = dev.name
+    local temp_x10  = math.floor(dev.temp  * 10 + 0.5)
+    local setpt_x10 = math.floor(dev.setpt * 10 + 0.5)
+
+    safe_set(name .. "_CurrentTemp", temp_x10)
+    safe_set(name .. "_Setpoint",    setpt_x10)
+    safe_set(name .. "_HoldType",    dev.hold)
+    safe_set(name .. "_Demand",      dev.demand)
+    safe_set(name .. "_Online",      dev.online)
+
+    if dbg then
+      lines[#lines+1] = string.format(
+        "  %-14s  %5.1f°C → %5.1f°C  %-10s  %3d%%  %s",
+        name, dev.temp, dev.setpt,
+        M.HOLD_NAMES[dev.hold] or tostring(dev.hold),
+        dev.demand,
+        dev.online == 1 and "online" or "OFFLINE"
+      )
+    end
+  end
+
+  safe_set("Unisenza_Status",      "OK")
+  safe_set("Unisenza_LastUpdated", ts)
+  safe_set("Unisenza_DeviceCount", #devices)
+
+  if dbg then
+    log("UNISENZA: ─── " .. ts .. " (" .. #devices .. " device(s)) ───")
+    for _, line in ipairs(lines) do log(line) end
+  end
 end
 
 return M
