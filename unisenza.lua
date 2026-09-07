@@ -8,7 +8,7 @@
 
   Usage — resident poll (call from a thin script_resident_poll.lua)
   -----------------------------------------------------------------
-    local unisenza = require("unisenza")
+    local unisenza = require("user.unisenza")
     unisenza.Resident_Poll({
       gateway_ip   = "192.168.1.59",
       gateway_euid = "001E5E090292DD94",
@@ -18,7 +18,7 @@
 
   Usage — low-level API (for event scripts / direct control)
   ----------------------------------------------------------
-    local unisenza = require("unisenza")
+    local unisenza = require("user.unisenza")
     local devices = unisenza.read_all()
     unisenza.set_temperature(device, 21.5)
     unisenza.set_hold(device, unisenza.HOLD_SCHEDULE)
@@ -101,9 +101,9 @@ local _ctx = nil
 
 local function get_ctx()
   if not _ctx then
-    local ok, aes = pcall(require, "aes")
+    local ok, aes = pcall(require, "user.aes")
     if not ok then
-      error("unisenza.lua requires aes.lua — load it first with require", 2)
+      error("unisenza.lua requires aes.lua — load it as require('user.aes')", 2)
     end
     local key = aes.salus_key(M.GATEWAY_EUID)   -- MD5("Salus-"..euid)..zeros(16)
     local iv  = aes.hex2bin(IV_HEX)

@@ -64,7 +64,7 @@ end
 
 function E.Event()
   local dbg      = is_debug()
-  local unisenza = require("unisenza")
+  local unisenza = require("user.unisenza")
 
   -- ── read the current setpoint and hold type from params ───────────────────
   local ok_sp, raw_sp = pcall(GetUserParam, CBUS_NETWORK,
