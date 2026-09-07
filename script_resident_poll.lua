@@ -10,7 +10,7 @@
 
   C-Bus User Parameters to create:
   ---------------------------------
-  Debug                   number   1 = verbose logging, 0 = silent  (standard across all scripts)
+  Debug                   boolean  true = verbose logging, false = silent
   Unisenza_Status         string   last poll result ("OK" or error)
   Unisenza_LastUpdated    string   timestamp of last successful poll
   Unisenza_DeviceCount    number   number of radiators discovered

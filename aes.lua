@@ -38,6 +38,7 @@ local M = {}
 
 local ffi    = require("ffi")
 local crypto = ffi.load("crypto")
+local encdec = require("encdec")
 
 ffi.cdef [[
   /* Opaque EVP context */
@@ -72,7 +73,6 @@ local AES256CBC = crypto.EVP_aes_256_cbc()
 -- ═════════════════════════════════════════════════════════════════════════════
 
 local function md5(s)
-  local encdec = require("encdec")
   return encdec.md5(s, true)   -- true = raw binary (16 bytes)
 end
 

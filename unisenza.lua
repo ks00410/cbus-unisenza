@@ -113,142 +113,20 @@ local function get_ctx()
 end
 
 -- ═════════════════════════════════════════════════════════════════════════════
--- JSON  (minimal — enough for our payloads)
+-- JSON + HTTP  (module-level requires — both confirmed on 5500AC)
 -- ═════════════════════════════════════════════════════════════════════════════
--- LogicMachine / 5500AC does not guarantee a built-in json library.
--- We use a minimal encoder for the small outgoing payloads, and a pure-Lua
--- decoder for the gateway responses.
 
-local function json_encode(v)
-  local t = type(v)
-  if     t == "nil"     then return "null"
-  elseif t == "boolean" then return tostring(v)
-  elseif t == "number"  then
-    if v == math.floor(v) then return string.format("%d", v)
-    else return string.format("%g", v) end
-  elseif t == "string"  then
-    return '"' .. v:gsub('\\','\\\\'):gsub('"','\\"')
-                   :gsub('\n','\\n'):gsub('\r','\\r') .. '"'
-  elseif t == "table" then
-    local is_arr = true
-    local max = 0
-    for k in pairs(v) do
-      if type(k) ~= "number" or k ~= math.floor(k) or k < 1 then
-        is_arr = false; break
-      end
-      if k > max then max = k end
-    end
-    if is_arr and max == #v then
-      local parts = {}
-      for _, val in ipairs(v) do parts[#parts+1] = json_encode(val) end
-      return "[" .. table.concat(parts, ",") .. "]"
-    else
-      local parts = {}
-      for k, val in pairs(v) do
-        parts[#parts+1] = json_encode(tostring(k)) .. ":" .. json_encode(val)
-      end
-      return "{" .. table.concat(parts, ",") .. "}"
-    end
-  end
-  return "null"
-end
-
-local function json_decode(s)
-  local pos = 1
-
-  local function skip_ws()
-    pos = s:match("^%s*()", pos)
-  end
-
-  local function decode_val()
-    skip_ws()
-    local c = s:sub(pos, pos)
-
-    if c == '"' then
-      pos = pos + 1
-      local result = {}
-      while true do
-        local ch = s:sub(pos, pos)
-        if ch == '"' then pos = pos + 1; break
-        elseif ch == '\\' then
-          pos = pos + 1
-          local esc = s:sub(pos, pos)
-          pos = pos + 1
-          if     esc == '"'  then result[#result+1] = '"'
-          elseif esc == '\\' then result[#result+1] = '\\'
-          elseif esc == '/'  then result[#result+1] = '/'
-          elseif esc == 'n'  then result[#result+1] = '\n'
-          elseif esc == 'r'  then result[#result+1] = '\r'
-          elseif esc == 't'  then result[#result+1] = '\t'
-          else result[#result+1] = esc end
-        else
-          result[#result+1] = ch
-          pos = pos + 1
-        end
-      end
-      return table.concat(result)
-
-    elseif c == '{' then
-      pos = pos + 1
-      local obj = {}
-      skip_ws()
-      if s:sub(pos,pos) == '}' then pos = pos + 1; return obj end
-      while true do
-        skip_ws()
-        local key = decode_val()
-        skip_ws()
-        pos = pos + 1   -- skip ':'
-        local val = decode_val()
-        obj[key] = val
-        skip_ws()
-        local sep = s:sub(pos,pos)
-        pos = pos + 1
-        if sep == '}' then break end
-      end
-      return obj
-
-    elseif c == '[' then
-      pos = pos + 1
-      local arr = {}
-      skip_ws()
-      if s:sub(pos,pos) == ']' then pos = pos + 1; return arr end
-      while true do
-        arr[#arr+1] = decode_val()
-        skip_ws()
-        local sep = s:sub(pos,pos)
-        pos = pos + 1
-        if sep == ']' then break end
-      end
-      return arr
-
-    elseif c == 't' then pos = pos + 4; return true
-    elseif c == 'f' then pos = pos + 5; return false
-    elseif c == 'n' then pos = pos + 4; return nil
-
-    else
-      local num_str = s:match("^%-?%d+%.?%d*[eE]?[+-]?%d*", pos)
-      pos = pos + #num_str
-      return tonumber(num_str)
-    end
-  end
-
-  return decode_val()
-end
-
--- ═════════════════════════════════════════════════════════════════════════════
--- HTTP REQUEST
--- ═════════════════════════════════════════════════════════════════════════════
+local json  = require("cjson")
+local http  = require("socket.http")
+local ltn12 = require("ltn12")
 
 local function gateway_request(command, body_table)
   local ctx = get_ctx()   -- cached: key schedule never re-expanded after first call
 
   local url     = string.format("http://%s:%d/deviceid/%s",
                                  M.GATEWAY_IP, M.GATEWAY_PORT, command)
-  local payload = json_encode(body_table)
+  local payload = json.encode(body_table)
   local cipher  = ctx:encrypt(payload)
-
-  local http  = require("socket.http")
-  local ltn12 = require("ltn12")
 
   local resp_chunks = {}
   local _, code = http.request({
@@ -268,7 +146,7 @@ local function gateway_request(command, body_table)
   end
 
   local plain = ctx:decrypt(table.concat(resp_chunks))
-  return json_decode(plain)
+  return json.decode(plain)
 end
 
 -- ═════════════════════════════════════════════════════════════════════════════
