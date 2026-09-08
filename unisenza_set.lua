@@ -18,10 +18,10 @@
 
   How setpoint control works
   --------------------------
-  Touch panel or rule writes an integer to NAME_Setpoint (temperature ×10,
-  e.g. 215 = 21.5 °C).  This script converts it back to °C, locates the
-  device via the gateway's readall response, and calls set_temperature(),
-  which also automatically switches the device to permanent hold.
+  Touch panel or rule writes a float to NAME_Setpoint (temperature in °C,
+  e.g. 21.5).  This script locates the device via the gateway's readall
+  response and calls set_temperature(), which also automatically switches
+  the device to permanent hold.
 
   How hold-type control works
   ---------------------------
@@ -72,7 +72,7 @@ function E.Event()
   local ok_ht, raw_ht = pcall(GetUserParam, CBUS_NETWORK,
                                RADIATOR_NAME .. "_HoldType")
 
-  local setpt_x10 = ok_sp and tonumber(raw_sp) or nil
+  local setpt_raw = ok_sp and tonumber(raw_sp) or nil
   local hold_type = ok_ht and tonumber(raw_ht) or nil
 
   -- ── find the device — use cache populated by unisenza_poll.lua ────────────
@@ -114,10 +114,9 @@ function E.Event()
     end
     dbglog("hold set OK → " .. mode_name, dbg)
 
-  elseif setpt_x10 ~= nil then
-    local celsius = setpt_x10 / 10
-    dbglog("setting temperature → " .. celsius .. " °C", dbg)
-    local ok = unisenza.set_temperature(target, celsius)
+  elseif setpt_raw ~= nil then
+    dbglog("setting temperature → " .. setpt_raw .. " °C", dbg)
+    local ok = unisenza.set_temperature(target, setpt_raw)
     if not ok then
       log("UNISENZA_SET [" .. RADIATOR_NAME .. "]: set_temperature failed")
       return
@@ -126,7 +125,7 @@ function E.Event()
     -- Write confirmed (rounded) value back
     pcall(SetUserParam, CBUS_NETWORK,
           RADIATOR_NAME .. "_Setpoint",
-          math.floor(target.setpt * 10 + 0.5))
+          target.setpt)
     pcall(SetUserParam, CBUS_NETWORK,
           RADIATOR_NAME .. "_HoldType", unisenza.HOLD_PERMANENT)
 

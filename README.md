@@ -92,13 +92,13 @@ Create these on network `0` (or whichever network you set in `CBUS_NETWORK`):
 **Per device** (use the exact name from the discovery log, e.g. `Romy`):
 | Parameter | Type | Notes |
 |---|---|---|
-| `NAME_CurrentTemp` | Number | Room temp ×10 (142 = 14.2 °C) |
-| `NAME_Setpoint` | Number | Setpoint ×10 — **write this to control temperature** |
+| `NAME_CurrentTemp` | Float | Room temperature in °C (e.g. 14.2) |
+| `NAME_Setpoint` | Float | Setpoint in °C — **write this to control temperature** |
 | `NAME_HoldType` | Number | 0=Schedule, 2=Hold, 7=Off, 10=Eco |
 | `NAME_Demand` | Number | Heating demand 0–100 % |
 | `NAME_Online` | Number | 1=online, 0=offline |
 
-> **Why ×10?** C-Bus user parameters are integers. Multiplying by 10 means 21.5 °C is stored as `215`. Divide by 10 in any display rule or visualisation.
+> The 5500AC supports native Float user parameters. Temperatures are stored as raw °C values (e.g. 21.5) — no ×10 encoding required.
 
 ### 6. Create event scripts (one per radiator)
 

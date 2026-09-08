@@ -16,8 +16,8 @@
   Unisenza_DeviceCount    number   number of radiators discovered
 
   Per device (NAME = exact device name from app, e.g. "Romy"):
-    NAME_CurrentTemp   number   room temp ×10  (142 = 14.2 °C)
-    NAME_Setpoint      number   setpoint ×10   (215 = 21.5 °C)
+    NAME_CurrentTemp   float    room temp in °C  (e.g. 14.2)
+    NAME_Setpoint      float    setpoint in °C   (e.g. 21.5) — writable
     NAME_HoldType      number   0=Schedule 2=Hold 7=Off 10=Eco
     NAME_Demand        number   heating demand 0–100 %
     NAME_Online        number   1=online 0=offline

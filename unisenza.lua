@@ -361,11 +361,8 @@ function M.Resident_Poll(config)
   local lines = {}
   for _, dev in ipairs(devices) do
     local name      = dev.name
-    local temp_x10  = math.floor(dev.temp  * 10 + 0.5)
-    local setpt_x10 = math.floor(dev.setpt * 10 + 0.5)
-
-    safe_set(name .. "_CurrentTemp", temp_x10)
-    safe_set(name .. "_Setpoint",    setpt_x10)
+    safe_set(name .. "_CurrentTemp", dev.temp)
+    safe_set(name .. "_Setpoint",    dev.setpt)
     safe_set(name .. "_HoldType",    dev.hold)
     safe_set(name .. "_Demand",      dev.demand)
     safe_set(name .. "_Online",      dev.online)
